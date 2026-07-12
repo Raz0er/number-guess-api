@@ -37,3 +37,21 @@ variable "public_key_path" {
   type        = string
   default     = "~/.ssh/id_ed25519.pub"
 }
+
+variable "github_owner" {
+  description = "GitHub repository owner"
+  type        = string
+  default     = "Raz0er"
+}
+
+variable "github_repository" {
+  description = "GitHub repository name"
+  type        = string
+  default     = "number-guess-api"
+}
+
+variable "github_branch" {
+  description = "GitHub branch allowed to assume the AWS deployment role"
+  type        = string
+  default     = "main"
+}

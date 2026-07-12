@@ -1,0 +1,21 @@
+#!/bin/bash
+
+set -euxo pipefail
+
+dnf update -y
+dnf install -y docker
+
+systemctl enable --now docker
+usermod -aG docker ec2-user
+
+docker pull razoer/number-guess-api:latest
+
+docker run \
+  --detach \
+  --name number-guess-api \
+  --restart unless-stopped \
+  --publish 80:8000 \
+  --env APP_VERSION=initial \
+  razoer/number-guess-api:latest
+
+echo "Number Guess API EC2 instance - managed by Terraform" > /etc/motd
