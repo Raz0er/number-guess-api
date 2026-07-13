@@ -65,6 +65,17 @@ data "aws_iam_policy_document" "github_actions_deploy" {
 
     resources = ["*"]
   }
+
+  statement {
+    sid    = "DiscoverApplicationInstance"
+    effect = "Allow"
+
+    actions = [
+      "ec2:DescribeInstances"
+    ]
+
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "github_actions_deploy" {

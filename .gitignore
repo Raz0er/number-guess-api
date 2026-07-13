@@ -25,12 +25,12 @@ Thumbs.db
 docker-compose.override.yml
 
 # Terraform local/state files
-terraform/.terraform/
-terraform/*.tfstate
-terraform/*.tfstate.*
-terraform/crash.log
-terraform/crash.*.log
-terraform/*.tfvars
-terraform/*.tfvars.json
-terraform/*.tfplan
-terraform/.terraform.tfstate.lock.info
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfplan
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
