@@ -20,7 +20,11 @@ resource "aws_instance" "app" {
   key_name                    = aws_key_pair.admin.key_name
   associate_public_ip_address = true
 
-  user_data                   = file("${path.module}/user_data.sh.tftpl")
+  user_data = templatefile("${path.module}/user_data.sh.tftpl", {
+    aws_region = var.aws_region
+    log_group  = aws_cloudwatch_log_group.app.name
+  })
+
   user_data_replace_on_change = true
 
   metadata_options {

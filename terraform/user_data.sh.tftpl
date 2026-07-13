@@ -16,6 +16,10 @@ docker run \
   --restart unless-stopped \
   --publish 80:8000 \
   --env APP_VERSION=initial \
+  --log-driver awslogs \
+  --log-opt awslogs-region=${aws_region} \
+  --log-opt awslogs-group=${log_group} \
+  --log-opt awslogs-stream=bootstrap \
   razoer/number-guess-api:latest
 
 echo "Number Guess API EC2 instance - managed by Terraform" > /etc/motd
