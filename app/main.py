@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 
 APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
+APP_COMMIT = os.getenv("APP_COMMIT", "local")
 
 
 app = FastAPI(
@@ -26,9 +27,10 @@ class GuessRequest(BaseModel):
     number: int = Field(..., ge=1, le=100)
 
 
-def reset_game():
+def reset_game() -> None:
     GameState.secret_number = randint(1, 100)
     GameState.attempts = 0
+
 
 @app.get("/", response_class=HTMLResponse)
 def frontend():
@@ -159,6 +161,7 @@ def health():
 def version():
     return {
         "version": APP_VERSION,
+        "commit": APP_COMMIT,
     }
 
 

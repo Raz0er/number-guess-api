@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.main import app, GameState
+from app.main import APP_COMMIT, APP_VERSION, GameState, app
 
 
 client = TestClient(app)
@@ -13,11 +13,14 @@ def test_health_endpoint():
     assert response.json()["status"] == "ok"
 
 
-def test_version_endpoint():
+def test_version():
     response = client.get("/version")
 
     assert response.status_code == 200
-    assert "version" in response.json()
+    assert response.json() == {
+        "version": APP_VERSION,
+        "commit": APP_COMMIT,
+    }
 
 
 def test_frontend_endpoint():
