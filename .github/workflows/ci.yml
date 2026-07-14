@@ -16,6 +16,7 @@ permissions:
 
 env:
   IMAGE_NAME: number-guess-api
+  AWS_LOG_GROUP: /number-guess-api/application
 
 jobs:
   test:
@@ -49,9 +50,30 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
 
+    outputs:
+      version: ${{ steps.release_meta.outputs.version }}
+      short_sha: ${{ steps.release_meta.outputs.short_sha }}
+      image_repository: ${{ steps.release_meta.outputs.image_repository }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Generate release metadata
+        id: release_meta
+        shell: bash
+        run: |
+          VERSION="v1.0.${GITHUB_RUN_NUMBER}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          IMAGE_REPOSITORY="${{ vars.DOCKERHUB_USERNAME }}/${IMAGE_NAME}"
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image_repository=${IMAGE_REPOSITORY}" >> "$GITHUB_OUTPUT"
+
+          echo "Version: ${VERSION}"
+          echo "Commit: ${SHORT_SHA}"
+          echo "Image repository: ${IMAGE_REPOSITORY}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -62,14 +84,14 @@ jobs:
           context: .
           load: true
           push: false
-          tags: number-guess-api:${{ github.sha }}
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: number-guess-api:${{ github.sha }}
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
           format: table
           exit-code: "1"
           ignore-unfixed: true
@@ -85,16 +107,222 @@ jobs:
 
       - name: Tag and push Docker image
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        shell: bash
         run: |
-          REMOTE_IMAGE="${{ vars.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}"
+          LOCAL_IMAGE="${IMAGE_NAME}:${GITHUB_SHA}"
+          REMOTE_IMAGE="${{ steps.release_meta.outputs.image_repository }}"
+          VERSION="${{ steps.release_meta.outputs.version }}"
 
-          docker tag \
-            number-guess-api:${{ github.sha }} \
-            "${REMOTE_IMAGE}:${{ github.sha }}"
+          docker tag "$LOCAL_IMAGE" "${REMOTE_IMAGE}:${GITHUB_SHA}"
+          docker tag "$LOCAL_IMAGE" "${REMOTE_IMAGE}:${VERSION}"
+          docker tag "$LOCAL_IMAGE" "${REMOTE_IMAGE}:latest"
 
-          docker tag \
-            number-guess-api:${{ github.sha }} \
-            "${REMOTE_IMAGE}:latest"
-
-          docker push "${REMOTE_IMAGE}:${{ github.sha }}"
+          docker push "${REMOTE_IMAGE}:${GITHUB_SHA}"
+          docker push "${REMOTE_IMAGE}:${VERSION}"
           docker push "${REMOTE_IMAGE}:latest"
+
+  deploy:
+    name: Deploy to EC2 through SSM
+    runs-on: ubuntu-latest
+    needs: docker
+
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      VERSION: ${{ needs.docker.outputs.version }}
+      SHORT_SHA: ${{ needs.docker.outputs.short_sha }}
+      IMAGE_REPOSITORY: ${{ needs.docker.outputs.image_repository }}
+
+    steps:
+      - name: Configure AWS credentials through OIDC
+        uses: aws-actions/configure-aws-credentials@v6.2.0
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: number-guess-api-deploy
+
+      - name: Find current EC2 instance
+        shell: bash
+        run: |
+          INSTANCE_DATA="$(aws ec2 describe-instances \
+            --filters \
+              "Name=tag:Name,Values=number-guess-api-ec2" \
+              "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].[InstanceId,PublicIpAddress]' \
+            --output text)"
+
+          INSTANCE_COUNT="$(printf '%s\n' "$INSTANCE_DATA" \
+            | sed '/^[[:space:]]*$/d' \
+            | wc -l)"
+
+          if [ "$INSTANCE_COUNT" -ne 1 ]; then
+            echo "Expected exactly one running EC2 instance."
+            echo "Found: ${INSTANCE_COUNT}"
+            exit 1
+          fi
+
+          read -r INSTANCE_ID PUBLIC_IP <<< "$INSTANCE_DATA"
+
+          if [ -z "$INSTANCE_ID" ] || \
+             [ -z "$PUBLIC_IP" ] || \
+             [ "$PUBLIC_IP" = "None" ]; then
+            echo "EC2 instance ID or public IP was not found."
+            exit 1
+          fi
+
+          echo "INSTANCE_ID=${INSTANCE_ID}" >> "$GITHUB_ENV"
+          echo "PUBLIC_URL=http://${PUBLIC_IP}" >> "$GITHUB_ENV"
+
+          echo "Instance ID: ${INSTANCE_ID}"
+          echo "Public URL: http://${PUBLIC_IP}"
+
+      - name: Prepare SSM deployment command
+        shell: bash
+        run: |
+          IMAGE="${IMAGE_REPOSITORY}:${VERSION}"
+
+          jq -n \
+            --arg image "$IMAGE" \
+            --arg version "$VERSION" \
+            --arg commit "$SHORT_SHA" \
+            --arg region "$AWS_REGION" \
+            --arg log_group "$AWS_LOG_GROUP" \
+            '{
+              commands: [
+                "set -euxo pipefail",
+                "docker pull \($image)",
+                "docker rm -f number-guess-api || true",
+                "docker run --detach --name number-guess-api --restart unless-stopped --publish 80:8000 --env APP_VERSION=\($version) --env APP_COMMIT=\($commit) --log-driver awslogs --log-opt awslogs-region=\($region) --log-opt awslogs-group=\($log_group) --log-opt awslogs-stream=number-guess-api-\($commit) \($image)",
+                "docker image prune --force"
+              ]
+            }' > ssm-parameters.json
+
+          cat ssm-parameters.json
+
+      - name: Send deployment command through SSM
+        shell: bash
+        run: |
+          COMMAND_ID="$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy ${VERSION} (${SHORT_SHA})" \
+            --parameters file://ssm-parameters.json \
+            --query 'Command.CommandId' \
+            --output text)"
+
+          if [ -z "$COMMAND_ID" ] || [ "$COMMAND_ID" = "None" ]; then
+            echo "SSM did not return a command ID."
+            exit 1
+          fi
+
+          echo "COMMAND_ID=${COMMAND_ID}" >> "$GITHUB_ENV"
+          echo "SSM command ID: ${COMMAND_ID}"
+
+      - name: Wait for deployment result
+        shell: bash
+        run: |
+          if ! aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID"; then
+
+            echo "SSM deployment failed or timed out."
+
+            aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" || true
+
+            exit 1
+          fi
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query '{
+              Status: Status,
+              StandardOutput: StandardOutputContent,
+              StandardError: StandardErrorContent
+            }'
+
+      - name: Run smoke tests
+        shell: bash
+        run: |
+          HEALTHY=false
+
+          for ATTEMPT in {1..15}; do
+            echo "Health check attempt ${ATTEMPT}/15"
+
+            if HEALTH_RESPONSE="$(curl -fsS "${PUBLIC_URL}/health")"; then
+              if jq -e '.status == "ok"' \
+                <<< "$HEALTH_RESPONSE" >/dev/null; then
+
+                echo "$HEALTH_RESPONSE"
+                HEALTHY=true
+                break
+              fi
+            fi
+
+            sleep 4
+          done
+
+          if [ "$HEALTHY" != "true" ]; then
+            echo "Application health check failed."
+            exit 1
+          fi
+
+          VERSION_RESPONSE="$(curl -fsS "${PUBLIC_URL}/version")"
+
+          echo "$VERSION_RESPONSE"
+
+          jq -e \
+            --arg version "$VERSION" \
+            --arg commit "$SHORT_SHA" \
+            '.version == $version and .commit == $commit' \
+            <<< "$VERSION_RESPONSE" >/dev/null
+
+          echo "Deployment verification passed."
+
+  tag_release:
+    name: Create Git release tag
+    runs-on: ubuntu-latest
+    needs:
+      - docker
+      - deploy
+
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository with history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Create and push Git tag
+        shell: bash
+        env:
+          VERSION: ${{ needs.docker.outputs.version }}
+        run: |
+          if git rev-parse -q \
+            --verify "refs/tags/${VERSION}" >/dev/null; then
+            echo "Git tag ${VERSION} already exists."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git tag \
+            --annotate "$VERSION" \
+            "$GITHUB_SHA" \
+            --message "Release ${VERSION}"
+
+          git push origin "$VERSION"
