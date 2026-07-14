@@ -18,16 +18,6 @@ resource "aws_vpc_security_group_ingress_rule" "http" {
   to_port     = 80
 }
 
-resource "aws_vpc_security_group_ingress_rule" "ssh" {
-  security_group_id = aws_security_group.app.id
-  description       = "Allow SSH only from administrator IP"
-
-  cidr_ipv4   = var.allowed_ssh_cidr
-  from_port   = 22
-  ip_protocol = "tcp"
-  to_port     = 22
-}
-
 resource "aws_vpc_security_group_egress_rule" "all_ipv4" {
   security_group_id = aws_security_group.app.id
   description       = "Allow outbound IPv4 traffic"

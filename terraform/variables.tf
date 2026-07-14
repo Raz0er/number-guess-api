@@ -22,22 +22,6 @@ variable "instance_type" {
   default     = "t3.micro"
 }
 
-variable "allowed_ssh_cidr" {
-  description = "Public IPv4 CIDR allowed to connect through SSH, for example 1.2.3.4/32"
-  type        = string
-
-  validation {
-    condition     = can(cidrnetmask(var.allowed_ssh_cidr))
-    error_message = "allowed_ssh_cidr must be a valid IPv4 CIDR, for example 1.2.3.4/32."
-  }
-}
-
-variable "public_key_path" {
-  description = "Path to the public SSH key"
-  type        = string
-  default     = "~/.ssh/id_ed25519.pub"
-}
-
 variable "github_owner" {
   description = "GitHub repository owner"
   type        = string
