@@ -11,6 +11,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
+ARG APP_VERSION=local
+ARG APP_COMMIT=local
+
+ENV APP_VERSION="${APP_VERSION}" \
+    APP_COMMIT="${APP_COMMIT}"
+
+LABEL org.opencontainers.image.version="${APP_VERSION}" \
+      org.opencontainers.image.revision="${APP_COMMIT}"
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \

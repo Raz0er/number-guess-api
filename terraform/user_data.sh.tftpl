@@ -15,7 +15,6 @@ docker run \
   --name number-guess-api \
   --restart unless-stopped \
   --publish 80:8000 \
-  --env APP_VERSION=initial \
   --log-driver awslogs \
   --log-opt awslogs-region=${aws_region} \
   --log-opt awslogs-group=${log_group} \
