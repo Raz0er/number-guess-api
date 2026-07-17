@@ -9,6 +9,14 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN groupadd --gid 10001 appgroup \
+    && useradd \
+        --uid 10001 \
+        --gid appgroup \
+        --create-home \
+        --no-log-init \
+        appuser
+
 COPY app ./app
 
 ARG APP_VERSION=local
@@ -21,6 +29,8 @@ LABEL org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.revision="${APP_COMMIT}"
 
 EXPOSE 8000
+
+USER appuser:appgroup
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()" || exit 1
