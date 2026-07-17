@@ -352,13 +352,11 @@ Instancja EC2 jest zarządzana przez AWS Systems Manager Session Manager, dlateg
 
 Pobranie identyfikatora instancji:
 
-INSTANCE_ID="$(terraform -chdir=terraform output -raw instance_id)"
+terraform -chdir=terraform output -raw instance_id
 
 Uruchomienie sesji:
 
-aws ssm start-session \
-  --region eu-central-1 \
-  --target "$INSTANCE_ID"
+aws ssm start-session --region eu-central-1 --target "$(terraform -chdir=terraform output -raw instance_id)"
 
 Po zakończeniu pracy sesję można zamknąć poleceniem:
 
