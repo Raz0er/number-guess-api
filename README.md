@@ -334,15 +334,17 @@ Nie należy usuwać pliku `terraform.tfstate` przed wykonaniem `terraform destro
 
 
 
-### Wymaganie OIDC
+Wymaganie OIDC
 
-Konto AWS musi posiadać skonfigurowanego dostawcę GitHub OIDC:
+Na koncie AWS musi być wcześniej skonfigurowany dostawca GitHub OIDC:
 
-```text
 https://token.actions.githubusercontent.com
-```
 
-Terraform wykorzystuje istniejącego providera do utworzenia roli wdrożeniowej dla GitHub Actions.
+Umożliwia on GitHub Actions uzyskanie krótkotrwałych poświadczeń AWS bez przechowywania stałych kluczy dostępowych. Terraform wykorzystuje istniejącego dostawcę OIDC do utworzenia roli IAM używanej podczas wdrażania aplikacji.
+
+Instrukcja konfiguracji:
+
+https://github.com/aws-actions/configure-aws-credentials#oidc-configuration-details
 
 ### Połączenie z instancją przez AWS Systems Manager
 
