@@ -272,6 +272,7 @@ curl http://127.0.0.1:8000/version
 ```
 
 Dockerfile zawiera również `HEALTHCHECK`, który cyklicznie sprawdza endpoint `/health`.
+Aplikacja w kontenerze działa jako nieuprzywilejowany użytkownik `appuser` z UID `10001`, zamiast jako użytkownik `root`.
 
 ---
 
@@ -492,6 +493,7 @@ W projekcie zastosowano:
 - Docker `HEALTHCHECK`,
 - smoke testy po wdrożeniu,
 - tworzenie taga Git dopiero po poprawnym deploymentcie.
+- uruchamianie aplikacji w kontenerze jako nieuprzywilejowany użytkownik `appuser`,
 
 Aplikacja działa obecnie przez HTTP. W środowisku produkcyjnym należałoby zastosować domenę, certyfikat TLS oraz HTTPS.
 
