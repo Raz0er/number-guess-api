@@ -190,7 +190,7 @@ number-guess-api/
 ├── Dockerfile
 ├── pytest.ini
 ├── requirements.txt
-├── requirements-dev.txt
+├── requirements-test.txt
 └── README.md
 ```
 
@@ -211,7 +211,7 @@ Instalacja zależności:
 
 ```bash
 python -m pip install --upgrade pip
-pip install -r requirements-dev.txt
+pip install -r requirements-test.txt
 ```
 
 Uruchomienie aplikacji:
