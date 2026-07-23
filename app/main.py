@@ -87,7 +87,7 @@ def frontend():
             <input id="number" type="number" min="1" max="100" />
             <br><br>
 
-            <button onclick="guessNumber()">Sprawdź</button>
+            <button onclick="guessNumber()">Sprawdź liczbę</button>
             <button onclick="resetGame()">Reset</button>
 
             <div id="result"></div>
