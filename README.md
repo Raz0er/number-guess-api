@@ -6,7 +6,7 @@ Aplikacja webowa/API napisana w Pythonie z użyciem FastAPI. Projekt prezentuje 
 
 - Repozytorium: https://github.com/Raz0er/number-guess-api
 - Obraz Docker Hub: https://hub.docker.com/r/razoer/number-guess-api
-- Publiczny adres aplikacji: `http://<PUBLIC_IP>`
+- Publiczny adres aplikacji: `http://63.176.160.17`
 
 Publiczny adres aplikacji można odczytać po utworzeniu infrastruktury:
 
@@ -72,7 +72,7 @@ Wartości `APP_VERSION` i `APP_COMMIT` są przekazywane podczas budowania obrazu
 Endpoint biznesowy służący do zgadywania liczby.
 
 ```bash
-curl -X POST http://<PUBLIC_IP>/guess \
+curl -X POST http://63.176.160.17/guess \
   -H "Content-Type: application/json" \
   -d '{"number": 50}'
 ```
@@ -98,7 +98,7 @@ Możliwe wyniki:
 Reset wykonuje się przez nagłówek `X-Reset-Game`:
 
 ```bash
-curl -X POST http://<PUBLIC_IP>/guess \
+curl -X POST http://63.176.160.17/guess \
   -H "X-Reset-Game: true"
 ```
 
@@ -116,7 +116,7 @@ Odpowiedź:
 FastAPI automatycznie udostępnia Swagger UI:
 
 ```text
-http://<PUBLIC_IP>/docs
+http://63.176.160.17/docs
 ```
 
 ---
